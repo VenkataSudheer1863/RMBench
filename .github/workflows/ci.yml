@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy pandas scikit-learn sentence-transformers requests rich tqdm \
+                    pyyaml matplotlib seaborn groq httpx python-dotenv
+        pip install pytest pytest-cov
+        pip install -e . --no-deps
+
+    - name: Run unit tests
+      run: |
+        pytest tests/ -v --cov=rmbench --cov-report=term-missing --cov-report=xml
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      if: matrix.python-version == '3.11'
+      with:
+        file: coverage.xml
+        fail_ci_if_error: false
+
+  dry-run-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy pandas scikit-learn sentence-transformers requests rich tqdm \
+                    pyyaml matplotlib seaborn groq httpx python-dotenv
+        pip install -e . --no-deps
+
+    - name: Dry-run benchmark (no API calls, no Ollama required)
+      run: |
+        python run_benchmark.py --dry-run \
+          --models mistral:7b gemma3:4b \
+          --attacks instruction_override context_poisoning \
+          --defenses none \
+          --samples 3
+      # Validates argument parsing, config construction, and backend routing only.
+      # Real benchmark runs require GROQ_KEY_* vars (not stored in CI) or Ollama running.
+
+    - name: Verify config and model registry imports
+      run: |
+        python -c "
+        from rmbench.config import ALL_MODELS, GROQ_MODELS, OLLAMA_MODELS, backend_for, ModelBackend
+        assert len(ALL_MODELS) == 6, f'Expected 6 models, got {len(ALL_MODELS)}'
+        assert len(GROQ_MODELS) == 3, f'Expected 3 Groq models, got {len(GROQ_MODELS)}'
+        assert len(OLLAMA_MODELS) == 3, f'Expected 3 Ollama models, got {len(OLLAMA_MODELS)}'
+        assert backend_for('mistral:7b') == ModelBackend.OLLAMA
+        assert backend_for('llama-3.3-70b-versatile') == ModelBackend.GROQ
+        print('Config OK:', ALL_MODELS)
+        "
+
+    - name: Verify results directory is clean (no pre-generated result data)
+      run: |
+        [ ! -f results/example_results.json ] || (echo "Synthetic result file should not exist" && exit 1)
+        echo "Results directory is clean — ready for real benchmark data."

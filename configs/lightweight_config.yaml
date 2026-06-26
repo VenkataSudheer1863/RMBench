@@ -1,0 +1,66 @@
+# Lightweight RMBench Configuration
+#
+# Uses Ollama local models — no API key, no rate limits, no internet dependency.
+# Best for: CI smoke tests, development iterations, quick local evaluation.
+#
+# Requires Ollama running: ollama serve
+# Model must be downloaded: ollama pull mistral:7b
+#
+# Run: python run_benchmark.py --models mistral:7b --attacks instruction_override context_poisoning goal_hijacking --defenses none --samples 5
+
+model:
+  name: "mistral:7b"
+  backend: "ollama"
+  api_base: "http://localhost:11434"
+  temperature: 0.0
+  max_tokens: 256
+  context_length: 32768
+
+attacks:
+  enabled:
+    - instruction_override
+    - context_poisoning
+    - goal_hijacking
+
+  parameters:
+    num_samples_per_attack: 5
+    attack_intensity: "medium"
+
+tasks:
+  enabled:
+    - question_answering
+    - code_generation
+    - tool_use
+
+  parameters:
+    num_samples_per_task: 5
+    task_complexity: "low"
+
+defenses:
+  enabled: []
+
+retrieval:
+  backend: "faiss"
+  top_k: 3
+  similarity_threshold: 0.7
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  max_doc_chars: 600
+
+evaluation:
+  output_dir: "results/lightweight"
+  save_intermediate: false
+  verbose: true
+  batch_size: 1
+  num_workers: 1
+  seed: 42
+
+metrics:
+  calculate:
+    - asr
+    - cri
+    - truthfulness
+
+logging:
+  level: "INFO"
+  log_file: "logs/rmbench_lightweight.log"
+  console_output: true

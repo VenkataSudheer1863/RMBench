@@ -1,0 +1,83 @@
+# Mid-scale RMBench Configuration
+#
+# Uses qwen/qwen3-32b (Groq cloud, 32B) — strong reasoning, 128k context.
+# Good for full evaluations with a capable mid-size model.
+#
+# Requires: GROQ_KEY_QWEN32B set in .env
+#
+# Run: python run_benchmark.py --models "qwen/qwen3-32b" --defenses none context_sanitization --samples 10
+
+model:
+  name: "qwen/qwen3-32b"
+  backend: "groq"
+  api_base: "https://api.groq.com/openai/v1"
+  temperature: 0.0
+  max_tokens: 256
+  top_p: 1.0
+  context_length: 131072
+
+attacks:
+  enabled:
+    - instruction_override
+    - context_poisoning
+    - goal_hijacking
+    - tool_manipulation
+    - authority_spoofing
+    - memory_poisoning
+
+  parameters:
+    num_samples_per_attack: 10
+    attack_intensity: "medium"
+
+tasks:
+  enabled:
+    - question_answering
+    - code_generation
+    - tool_use
+    - planning
+    - summarization
+
+  parameters:
+    num_samples_per_task: 10
+    task_complexity: "medium"
+
+defenses:
+  enabled:
+    - context_sanitization
+    - injection_detection
+
+  context_sanitization:
+    enabled: true
+    strict_mode: false
+
+  injection_detection:
+    enabled: true
+    threshold: 0.5
+
+retrieval:
+  backend: "faiss"
+  top_k: 5
+  similarity_threshold: 0.7
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  max_doc_chars: 600
+
+evaluation:
+  output_dir: "results/midscale"
+  save_intermediate: true
+  verbose: true
+  batch_size: 1
+  num_workers: 1
+  seed: 42
+
+metrics:
+  calculate:
+    - asr
+    - cri
+    - truthfulness
+    - tool_safety
+    - goal_preservation
+
+logging:
+  level: "INFO"
+  log_file: "logs/rmbench_midscale.log"
+  console_output: true
